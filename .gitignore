@@ -1,0 +1,26 @@
+# Entornos virtuales
+venv/
+.venv/
+env/
+.env/
+
+# Archivos de configuración específicos de VS Code
+.vscode/
+
+# Archivos de configuración de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos de log
+*.log
+
+# Archivos de caché
+__pycache__/
+*.pyc
+
+# Archivos sensibles
+config.py
+.env
+
+# Directorios de dependencia
+node_modules/
