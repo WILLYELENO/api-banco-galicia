@@ -4,6 +4,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import json
+import re
 
 # Inicializar el navegador
 driver = webdriver.Chrome()  # Asegúrate de que el ChromeDriver esté en tu PATH
@@ -62,7 +63,7 @@ simular_button.click()
 time.sleep(5)
 
 # Ingresar el CUIT
-cuit_value = "20111686441"  # Define el CUIT que deseas ingresar
+cuit_value = "30717432114"#"20111686441"  # Define el CUIT que deseas ingresar
 cuit_input = WebDriverWait(driver, 10).until(
     EC.visibility_of_element_located((By.ID, "INGRESO-INPUT-CUIT"))
 )
@@ -76,6 +77,28 @@ continuar_button.click()
 
 # Esperar un poco para que se cargue la nueva página
 time.sleep(5)
+
+# Esperar a que el contenedor de préstamos esté presente
+prestamos_container = WebDriverWait(driver, 10).until(
+    EC.presence_of_element_located((By.CSS_SELECTOR, "div.grid-base"))
+)
+
+# Asegúrate de que el contenedor se haya cargado completamente
+time.sleep(2)
+
+# Capturar el textContent de la div que contiene todos los préstamos
+all_prestamos_text = prestamos_container.text
+
+# Ajustar la expresión regular
+prestamos_info = re.findall(r'Préstamo (.*?)\n(.*?)\nPuede pedir hasta\n(\$[\d\.,]+)', all_prestamos_text, re.DOTALL)
+
+# Mostrar resultados
+for prestamo in prestamos_info:
+    nombre, tipo_tasa, monto_maximo = prestamo
+    print(f"Nombre del Préstamo: {nombre.strip()}, Tipo de Tasa: {tipo_tasa.strip()}, Monto Máximo: {monto_maximo.strip()}")
+# Imprimir el texto de todos los préstamos
+print("Información de todos los préstamos:")
+print(all_prestamos_text)
 
 # Cerrar el navegador al final
 #driver.quit()
