@@ -1,121 +1,190 @@
-import requests
-import json
 from flask import Flask, jsonify, request
 from flasgger import Swagger
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import time
+import re
 
 app = Flask(__name__)
 swagger = Swagger(app)
 
-BASE_URL = "https://wsec06.bancogalicia.com.ar/"
-LOGIN_URL =f" {BASE_URL}Users/LogIn"  # Asegúrate de que esta URL sea correctahttps://wsec06.bancogalicia.com.ar/Users/LogIn
-OFERTAS_URL = f"{BASE_URL}api/ofertas"
-
-# Credenciales (se pueden mover a un archivo de configuración o variables de entorno)
-USERNAME = "jquinonez001"
-PASSWORD = "Siembro08$"
-@app.route('/api/login', methods=['POST'])
-def login():
+@app.route('/api/simular', methods=['POST'])
+def simular_financiacion():
     """
-    Endpoint para autenticarse en el sistema de Banco Galicia.
+    Endpoint para simular financiación y obtener información de préstamos para múltiples CUITs.
     ---
-    responses:
-      200:
-        description: Autenticación exitosa
+    parameters:
+      - name: cuit_list
+        in: body
+        required: true
         schema:
           type: object
           properties:
-            token:
-              type: string
-      401:
-        description: Error de autenticación
+            cuit_list:
+              type: array
+              items:
+                type: string
+                description: "Lista de CUITs para los que se desea simular financiación"
+    responses:
+      200:
+        description: Información de préstamos obtenida exitosamente
+        schema:
+          type: object
+          properties:
+            resultados:
+              type: array
+              items:
+                type: object
+                properties:
+                  cuit:
+                    type: string
+                  nombre_persona:
+                    type: string
+                  prestamos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nombre:
+                          type: string
+                        tipo_tasa:
+                          type: string
+                        monto_maximo:
+                          type: string
+      400:
+        description: Error en los datos de entrada
+      500:
+        description: Error en el procesamiento
     """
-    session = requests.Session()
+    data = request.get_json()
+    if not data or 'cuit_list' not in data:
+        return jsonify({"error": "CUIT es requerido"}), 400
 
-    # Realizar la primera solicitud para cargar el dispositivo de autenticación
-    response = session.get(BASE_URL)
-    if response.status_code != 200:
-        return jsonify({"error": "Error al cargar el dispositivo de autenticación"}), 401
 
-    # Datos de autenticación
-    login_data = {
-        'username': USERNAME,
-        'password': PASSWORD,
-        '__RequestVerificationToken': response.cookies.get('__RequestVerificationToken')  # Asumiendo que se necesita este token
-    }
+    cuit_list = data['cuit_list']
+    resultados = []
 
-    # Realizar la solicitud de login
-    response = session.post(LOGIN_URL, data=login_data, allow_redirects=True)
+    # 1) Inicializamos el navegador , activamos el driver y abrimos la pagina de inicio
+    driver = webdriver.Chrome()  
+    driver.get("https://wsec06.bancogalicia.com.ar")  
 
-    # Manejar redirecciones
-    if response.history:
-        for resp in response.history:
-            print(f"Redirected from {resp.url} to {response.url}")
+    # Esperamos un poco para que la página cargue
+    time.sleep(2)
 
-    if response.status_code == 200:
-        # Aquí ajusta según cómo obtienes el token
-        bearer_token = response.cookies.get('session_id')  # Ejemplo de cómo obtener la cookie de sesión
-        if bearer_token:
-            return jsonify({"token": bearer_token}), 200
-        else:
-            return jsonify({"error": "Token no encontrado en la respuesta"}), 401
-    else:
-        return jsonify({"error": "Error de autenticación"}), 401
+    # 2) Buscamos los campos de nombre de usuario y contraseña
+    username_field = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.NAME, "UserID"))
+    )
+    password_field = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((By.NAME, "Password"))
+    )
 
-# @app.route('/api/ofertas', methods=['GET'])
-# def get_ofertas():
-#     """
-#     Obtener líneas de financiamiento disponibles para un CUIT.
-#     ---
-#     parameters:
-#       - name: cuit
-#         in: query
-#         type: string
-#         required: true
-#     responses:
-#       200:
-#         description: Listado de líneas de préstamo y montos máximos
-#         schema:
-#           id: Ofertas
-#           properties:
-#             ofertas:
-#               type: array
-#               items:
-#                 type: object
-#                 properties:
-#                   nombre:
-#                     type: string
-#                   monto_maximo:
-#                     type: number
-#       400:
-#         description: Error de entrada
-#     """
-#     cuit = request.args.get('cuit')
-#     if not cuit:
-#         return jsonify({"error": "CUIT es requerido"}), 400
+        #2.1) Ingresamos las credenciales de acceso
+    username_field.send_keys("jquinonez001")  
+    password_field.send_keys("Siembro08$")  
 
-#     session = requests.Session()
+        #2.2) Buscamos el botón de inicio de sesión
+    login_button = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.ID, "submitButton"))
+    )
+    driver.execute_script("arguments[0].click();", login_button)
 
-#     # Realizar login primero
-#     login_data = {'username': USERNAME, 'password': PASSWORD}
-#     response = session.post(LOGIN_URL, data=login_data)
+    time.sleep(5)
 
-#     if response.status_code != 200:
-#         return jsonify({"error": "Error de autenticación"}), 401
+    # 3) Buscamos la pestaña de 'Financiaciones' y hacemos click
+    financiaciones_tab = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//a[text()='Financiaciones']"))
+    )
+    financiaciones_tab.click()
 
-#     # Obtener ofertas
-#     ofertas_response = session.get(OFERTAS_URL, params={'cuit': cuit})
+    # 4) Una vez abierto el modal, buscamos la opción  'Socio de valor' y también hacemos click
+    socio_de_valor_tab = WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//a[text()='Socio de valor']"))
+    )
+    socio_de_valor_tab.click()
 
-#     if ofertas_response.status_code != 200:
-#         return jsonify({"error": "Error al obtener ofertas"}), 400
+    time.sleep(5)
 
-#     ofertas_data = ofertas_response.json()
-#     result = [{"nombre": oferta["nombre"], "monto_maximo": oferta["montoMaximo"]} for oferta in ofertas_data]
 
-#     # Generar archivo JSON de ejemplo
-#     with open(f"{cuit}_ofertas.json", 'w') as outfile:
-#         json.dump(result, outfile)
+    # 5) Búsqueda de líneas de crédito disponibles por cuit.
 
-#     return jsonify({"ofertas": result})
+    count = 0
+    for cuit_value in cuit_list:
 
+        # 5.1)  Hacemos clic en el botón 'Simular'. 
+
+         #Como solo hacemos click en el primer caso de búsqueda, establecemos un control de uso
+        if not count > 0:
+
+            simular_button = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, "//button[@aria-label='Simular']"))
+            )
+            simular_button.click()
+            
+            time.sleep(15)
+
+        # 5.2) Ingresamos el CUIT
+        cuit_input = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "INGRESO-INPUT-CUIT"))
+        )
+        cuit_input.send_keys(cuit_value)
+
+        # 5.3) Hacemos click en el botón 'Continuar'
+        continuar_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "INGRESO-BUTTON-CONTINUAR"))
+        )
+        continuar_button.click()
+
+        time.sleep(15)
+
+        # 5.4) Buscamos el contenedor que muestra los préstamos disponibles.
+        prestamos_container = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.grid-base"))
+        )
+        time.sleep(15)
+
+        # 5.5) Almacenamos la propiedad 'textContent' de la div que contiene todos los préstamos
+        all_prestamos_text = prestamos_container.text
+
+        # 5.6) Almacenamos el nombre de la persona (titular del cuit)
+        nombre_persona = all_prestamos_text.split("financiación para ")[1].split("\n")[0]
+
+        # 5.7) Filtramos la información para que nos quede solo lo referido a los préstamos
+        prestamos_info = re.findall(r'Préstamo (.*?)\n(.*?)\nPuede pedir hasta\n(\$[\d\.,]+)', all_prestamos_text, re.DOTALL)
+
+        # 5.8) Estructuramos el json a devolver
+        prestamos_resultados = []
+        for prestamo in prestamos_info:
+            nombre, tipo_tasa, monto_maximo = prestamo
+            prestamos_resultados.append({
+                "nombre": nombre.strip(),
+                "tipo_tasa": tipo_tasa.strip(),
+                "monto_maximo": monto_maximo.strip()
+            })
+
+        resultados.append({
+        "cuit": cuit_value,
+        "nombre_persona": nombre_persona.strip(),
+        "prestamos": prestamos_resultados
+            })
+        
+        # 5.9) Hacemos click en el botón 'Volver'
+        volver_button = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.ID, "INGRESO-BUTTON-VOLVER"))
+        )
+        volver_button.click()
+
+        count +=1 #modifcamos la variable de control.
+        
+        time.sleep(15)
+
+    # Al finalizar, cerramos el navegador
+    driver.quit()
+
+   
+
+    return jsonify({"resultados": resultados}), 200
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
