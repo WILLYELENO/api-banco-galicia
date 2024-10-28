@@ -117,8 +117,8 @@ def simular_financiacion():
       )
 
           #2.1) Ingresamos las credenciales de acceso
-      username_field.send_keys("jquinonez001")  
-      password_field.send_keys("Siembro08$")  
+      username_field.send_keys("xxxxxx")  #Colocar usuario
+      password_field.send_keys("xxxxx") #Colocar password 
 
           #2.2) Buscamos el botón de inicio de sesión
       login_button = WebDriverWait(driver, 10).until(
