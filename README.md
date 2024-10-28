@@ -44,6 +44,7 @@ pip install -r requirements.txt
 POSTGRES_URL="postgres://<usuario>:<contraseña>@<host>:<puerto>/<nombre_base_datos>"
 
 ###Uso
+Colocar en username y userpassword las credenciales de acceso respectivas
 
 from app import db
 with app.app_context():
