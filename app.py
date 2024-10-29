@@ -180,19 +180,31 @@ def simular_financiacion():
                 EC.presence_of_element_located((By.CSS_SELECTOR, "div.Notification--Content"))
             )
             if "no podemos ofrecerte Socio de Valor" in notification.text:
-                no_calificados.append(cuit_value)
-                no_califica = True
-                #print(f"CUIT no calificado: {cuit_value}")
+              no_calificados.append(cuit_value)
+              no_califica = True
+              #print(f"CUIT no calificado: {cuit_value}")
 
-               # Hacer clic en el botón "Aceptar"
-                aceptar_button = WebDriverWait(driver, 10).until(
-                    EC.element_to_be_clickable((By.ID, "FEEDBACK-BUTTON_PRIMARY"))
-                )
-                aceptar_button.click()  # Click en el botón 'Aceptar'
-                
+              # Hacer clic en el botón "Aceptar"
+              aceptar_button = WebDriverWait(driver, 10).until(
+                  EC.element_to_be_clickable((By.ID, "FEEDBACK-BUTTON_PRIMARY"))
+              )
+              aceptar_button.click()  # Click en el botón 'Aceptar'
+              
 
-                time.sleep(15)
-                continue  # Continúa al siguiente CUIT
+              time.sleep(15)
+              continue  # Continúa al siguiente CUIT
+            
+            if "El saldo de tu cliente es negativo o hay débitos pendiente\nNo se encontraron cuentas validas en la oferta. Comunicarse con su oficial!" in notification.text:
+              # Hacer clic en el botón "Aceptar" (con base en el ID proporcionado)
+              no_calificados.append(cuit_value)
+              no_califica = True
+              aceptar_button = WebDriverWait(driver, 10).until(
+                  EC.element_to_be_clickable((By.ID, "FEEDBACK-BUTTON_PRIMARY"))
+              )
+              aceptar_button.click()  # Click en el botón 'Aceptar'
+              time.sleep(10) 
+              continue  # Continúa al siguiente CUIT
+
           except:
               pass  # Si no se encuentra el elemento, simplemente continúa
 
